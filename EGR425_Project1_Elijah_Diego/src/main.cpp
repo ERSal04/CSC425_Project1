@@ -1,6 +1,7 @@
 #include <M5Core2.h>
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <NTPClient.h>
 #include "EGR425_Phase1_weather_bitmap_images.h"
 #include "WiFi.h"
 #include "config.h"
@@ -71,12 +72,7 @@ void setup()
 void loop()
 {
     M5.update();
-
-    if (M5.BtnA.wasPressed()) {
-        switchLocations();
-        lastTime = 0;
-    }
-
+    
     // Only execute every so often
     if ((millis() - lastTime) > timerDelay)
     {
@@ -87,7 +83,7 @@ void loop()
             // TODO 4: Hardcode the specific city,state,country into the query
             // Examples: https://api.openweathermap.org/data/2.5/weather?q=riverside,ca,usa&units=imperial&appid=YOUR_API_KEY
             //////////////////////////////////////////////////////////////////
-            String serverURL = urlOpenWeather + "q="+ city + ",ca,usa&units=imperial&appId=" + apiKey;
+            String serverURL = urlOpenWeather + "q=riverside,ca,usa&units=imperial&appId=" + apiKey;
             Serial.println(serverURL); // Debug print
 
             //////////////////////////////////////////////////////////////////
@@ -299,21 +295,6 @@ void drawWeatherImage(String iconId, int resizeMult)
     }
 }
 
-void switchLocations() {
-    if (currentLocation == RIVERSIDE) {
-        currentLocation = SAN_FRANCISCO;
-        city = "sanfrancisco";
-        // M5.Lcd.printf("Fetching weather for %s", city);
-    } else if (currentLocation == SAN_FRANCISCO) {
-        currentLocation = LOS_ANGELES;
-        city = "losangeles";
-        M5.Lcd.printf("Fetching weather for %s", city);
-    } else {
-        currentLocation = RIVERSIDE;
-        city = "riverside";
-        // M5.Lcd.printf("Fetching weather for %s", city);
-    }
-}
 //////////////////////////////////////////////////////////////////////////////////
 // For more documentation see the following links:
 // https://github.com/m5stack/m5-docs/blob/master/docs/en/api/
