@@ -2,9 +2,11 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <NTPClient.h>
-#include "EGR425_Phase1_weather_bitmap_images.h"
+// #include "EGR425_Phase1_weather_bitmap_images.h"
 #include "WiFi.h"
 #include "config.h"
+#include "timestamp.h"
+#include "layout.h"
 
 // ===============================================
 // THIS IS THE IN CLASS LAB FILE
@@ -26,21 +28,14 @@ unsigned long lastTime = 0;
 unsigned long timerDelay = 5000; // 5000; 5 minutes (300,000ms) or 5 seconds (5,000ms)
 
 // LCD variables
-int sWidth;
-int sHeight;
-
-// Enum for different city locatios
-enum CityLocations { RIVERSIDE, SAN_FRANCISCO, LOS_ANGELES };
-CityLocations currentLocation = RIVERSIDE;
-String city = "riverside";
-
+// int sWidth;
+// int sHeight;
 
 ////////////////////////////////////////////////////////////////////
 // Method header declarations
 ////////////////////////////////////////////////////////////////////
 String httpGETRequest(const char *serverName);
-void drawWeatherImage(String iconId, int resizeMult);
-void switchLocations();
+// void drawWeatherImage(String iconId, int resizeMult);
 
 ///////////////////////////////////////////////////////////////
 // Put your setup code here, to run once
@@ -50,9 +45,11 @@ void setup()
     // Initialize the device
     M5.begin();
 
+    getScreenMetrics();
+
     // Set screen orientation and get height/width
-    sWidth = M5.Lcd.width();
-    sHeight = M5.Lcd.height();
+    // sWidth = M5.Lcd.width();
+    // sHeight = M5.Lcd.height();
 
     // TODO 2: Connect to WiFi
     WiFi.begin(wifiNetworkName.c_str(), wifiPassword.c_str());
@@ -64,6 +61,8 @@ void setup()
     }
     Serial.print("\n\nConnected to Wi-Fi network with IP address: ");
     Serial.println(WiFi.localIP());
+
+    initTimeClient();
 }
 
 ///////////////////////////////////////////////////////////////
@@ -72,18 +71,23 @@ void setup()
 void loop()
 {
     M5.update();
-    
+
     // Only execute every so often
     if ((millis() - lastTime) > timerDelay)
     {
         if (WiFi.status() == WL_CONNECTED)
         {
+            updateTime();
 
             //////////////////////////////////////////////////////////////////
             // TODO 4: Hardcode the specific city,state,country into the query
             // Examples: https://api.openweathermap.org/data/2.5/weather?q=riverside,ca,usa&units=imperial&appid=YOUR_API_KEY
+            // https://api.openweathermap.org/data/2.5/weather?q=london&units=imperial&appid=YOUR_API_KEY
+            // https://api.openweathermap.org/data/2.5/weather?q=chino,ca,usa&units=imperial&appid=YOUR_API_KEY
+            // https://api.openweathermap.org/data/2.5/weather?q=washington,dc,usa&units=imperial&appid=YOUR_API_KEY
+            // https://api.openweathermap.org/data/2.5/weather?q=tokyo,jp&units=imperial&appid=YOUR_API_KEY
             //////////////////////////////////////////////////////////////////
-            String serverURL = urlOpenWeather + "q=riverside,ca,usa&units=imperial&appId=" + apiKey;
+            String serverURL = urlOpenWeather + "q=tokyo,jp&units=imperial&appId=" + apiKey;
             Serial.println(serverURL); // Debug print
 
             //////////////////////////////////////////////////////////////////
@@ -147,54 +151,44 @@ void loop()
             //////////////////////////////////////////////////////////////////
             // M5.Lcd.drawBitmap(0, 0, 100, 100, myBitmap, TFT_BLACK);
 
-            if (strWeatherIcon.indexOf('d') > 0) {
-              M5.Lcd.fillScreen(TFT_CYAN);
-              primaryTextColor = TFT_BLACK;
-            } else {
-              M5.Lcd.fillScreen(TFT_NAVY);
-              primaryTextColor = TFT_WHITE;
-            }
+            drawGradientStyle(tempNow, tempMin, tempMax, cityName, strWeatherDesc, strWeatherIcon, primaryTextColor);
+
+            // if (strWeatherIcon.indexOf('d') > 0) {
+            //   M5.Lcd.fillScreen(TFT_CYAN);
+            //   primaryTextColor = TFT_BLACK;
+            // } else {
+            //   M5.Lcd.fillScreen(TFT_NAVY);
+            //   primaryTextColor = TFT_WHITE;
+            // }
 
             // TODO 12.5 Draw the icon on the right side of the screen
-            drawWeatherImage(strWeatherIcon, 2);
+            // drawWeatherImage(strWeatherIcon, 2);
             
-            // TODO 13 draw icons and text
-
-            //////////////////////////////////////////////////////////////////
-            // This code will draw the temperature centered on the screen; left
-            // it out in favor of another formatting style
-            //////////////////////////////////////////////////////////////////
-            M5.Lcd.setTextColor(TFT_WHITE);
-            int textSize = 10;
-            M5.Lcd.setTextSize(textSize);
-            int iTempNow = tempNow;
-            int tWidth = textSize * String(iTempNow).length() * 5;
-            int tHeight = textSize * 5;
-            M5.Lcd.setCursor(sWidth/2 - tWidth/2,sHeight/2 - tHeight/2);
-            M5.Lcd.print(iTempNow);
 
             //////////////////////////////////////////////////////////////////
             // TODO 13: Draw the temperatures and city name
             //////////////////////////////////////////////////////////////////
-            int pad = 10;
-            M5.Lcd.setCursor(pad, pad);
-            M5.Lcd.setTextColor(TFT_BLUE);
-            M5.Lcd.setTextSize(3);
-            M5.Lcd.printf("LO:%0.fF\n", tempMin);
+            // int pad = 10;
+            // M5.Lcd.setCursor(pad, pad);
+            // M5.Lcd.setTextColor(TFT_BLUE);
+            // M5.Lcd.setTextSize(3);
+            // M5.Lcd.printf("LO:%0.fF\n", tempMin);
 
-            M5.Lcd.setCursor(M5.Lcd.getCursorX() + pad, M5.Lcd.getCursorY());
-            M5.Lcd.setTextColor(primaryTextColor);
-            M5.Lcd.setTextSize(10);
-            M5.Lcd.printf("%0.fF\n", tempNow);
+            // M5.Lcd.setCursor(M5.Lcd.getCursorX() + pad, M5.Lcd.getCursorY());
+            // M5.Lcd.setTextColor(primaryTextColor);
+            // M5.Lcd.setTextSize(10);
+            // M5.Lcd.printf("%0.fF\n", tempNow);
 
-            M5.Lcd.setCursor(M5.Lcd.getCursorX() + pad, M5.Lcd.getCursorY());
-            M5.Lcd.setTextColor(TFT_RED);
-            M5.Lcd.setTextSize(3);
-            M5.Lcd.printf("HI:%0.fF\n", tempMax);
+            // M5.Lcd.setCursor(M5.Lcd.getCursorX() + pad, M5.Lcd.getCursorY());
+            // M5.Lcd.setTextColor(TFT_RED);
+            // M5.Lcd.setTextSize(3);
+            // M5.Lcd.printf("HI:%0.fF\n", tempMax);
 
-            M5.Lcd.setCursor(M5.Lcd.getCursorX() + pad, M5.Lcd.getCursorY());
-            M5.Lcd.setTextColor(primaryTextColor);
-            M5.Lcd.printf("%s\n", cityName.c_str());
+            // M5.Lcd.setCursor(M5.Lcd.getCursorX() + pad, M5.Lcd.getCursorY());
+            // M5.Lcd.setTextColor(primaryTextColor);
+            // M5.Lcd.printf("%s\n", cityName.c_str());
+
+            // drawTimeStamp(10, sHeight - 30, primaryTextColor);
         }
         else
         {
@@ -244,59 +238,53 @@ String httpGETRequest(const char *serverURL)
 // of the native 100x100 pixels) on the right-hand side of the
 // screen (centered vertically).
 /////////////////////////////////////////////////////////////////
-void drawWeatherImage(String iconId, int resizeMult)
-{
+// void drawWeatherImage(String iconId, int resizeMult)
+// {
 
-    // Get the corresponding byte array
-    const uint16_t *weatherBitmap = getWeatherBitmap(iconId);
+//     // Get the corresponding byte array
+//     const uint16_t *weatherBitmap = getWeatherBitmap(iconId);
 
-    // Compute offsets so that the image is centered vertically and is
-    // right-aligned
-    int yOffset = -(resizeMult * imgSqDim - M5.Lcd.height()) / 2;
-    int xOffset = sWidth - (imgSqDim * resizeMult * .8); // Right align (image doesn't take up entire array)
-    // int xOffset = (M5.Lcd.width() / 2) - (imgSqDim * resizeMult / 2); // center horizontally
+//     // Compute offsets so that the image is centered vertically and is
+//     // right-aligned
+//     int yOffset = -(resizeMult * imgSqDim - M5.Lcd.height()) / 2;
+//     int xOffset = sWidth - (imgSqDim * resizeMult * .8); // Right align (image doesn't take up entire array)
+//     // int xOffset = (M5.Lcd.width() / 2) - (imgSqDim * resizeMult / 2); // center horizontally
 
-    // Iterate through each pixel of the imgSqDim x imgSqDim (100 x 100) array
-    for (int y = 0; y < imgSqDim; y++)
-    {
-        for (int x = 0; x < imgSqDim; x++)
-        {
-            // Compute the linear index in the array and get pixel value
-            int pixNum = (y * imgSqDim) + x;
-            uint16_t pixel = weatherBitmap[pixNum];
+//     // Iterate through each pixel of the imgSqDim x imgSqDim (100 x 100) array
+//     for (int y = 0; y < imgSqDim; y++)
+//     {
+//         for (int x = 0; x < imgSqDim; x++)
+//         {
+//             // Compute the linear index in the array and get pixel value
+//             int pixNum = (y * imgSqDim) + x;
+//             uint16_t pixel = weatherBitmap[pixNum];
 
-            // If the pixel is black, do NOT draw (treat it as transparent);
-            // otherwise, draw the value
-            if (pixel != 0)
-            {
-                // 16-bit RBG565 values give the high 5 pixels to red, the middle
-                // 6 pixels to green and the low 5 pixels to blue as described
-                // here: http://www.barth-dev.de/online/rgb565-color-picker/
-                byte red = (pixel >> 11) & 0b0000000000011111;
-                red = red << 3;
-                byte green = (pixel >> 5) & 0b0000000000111111;
-                green = green << 2;
-                byte blue = pixel & 0b0000000000011111;
-                blue = blue << 3;
+//             // If the pixel is black, do NOT draw (treat it as transparent);
+//             // otherwise, draw the value
+//             if (pixel != 0)
+//             {
+//                 // 16-bit RBG565 values give the high 5 pixels to red, the middle
+//                 // 6 pixels to green and the low 5 pixels to blue as described
+//                 // here: http://www.barth-dev.de/online/rgb565-color-picker/
+//                 byte red = (pixel >> 11) & 0b0000000000011111;
+//                 red = red << 3;
+//                 byte green = (pixel >> 5) & 0b0000000000111111;
+//                 green = green << 2;
+//                 byte blue = pixel & 0b0000000000011111;
+//                 blue = blue << 3;
 
-                // Scale image; for example, if resizeMult == 2, draw a 2x2
-                // filled square for each original pixel
-                for (int i = 0; i < resizeMult; i++)
-                {
-                    for (int j = 0; j < resizeMult; j++)
-                    {
-                        int xDraw = x * resizeMult + i + xOffset;
-                        int yDraw = y * resizeMult + j + yOffset;
-                        M5.Lcd.drawPixel(xDraw, yDraw, M5.Lcd.color565(red, green, blue));
-                    }
-                }
-            }
-        }
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////////////
-// For more documentation see the following links:
-// https://github.com/m5stack/m5-docs/blob/master/docs/en/api/
-// https://docs.m5stack.com/en/api/core2/lcd_api
-//////////////////////////////////////////////////////////////////////////////////
+//                 // Scale image; for example, if resizeMult == 2, draw a 2x2
+//                 // filled square for each original pixel
+//                 for (int i = 0; i < resizeMult; i++)
+//                 {
+//                     for (int j = 0; j < resizeMult; j++)
+//                     {
+//                         int xDraw = x * resizeMult + i + xOffset;
+//                         int yDraw = y * resizeMult + j + yOffset;
+//                         M5.Lcd.drawPixel(xDraw, yDraw, M5.Lcd.color565(red, green, blue));
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }

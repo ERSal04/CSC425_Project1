@@ -7564,7 +7564,7 @@ const uint16_t i50d [] PROGMEM = {
 // This method takes in a String, which is parsed fromt the weather response
 // and matches it to the corresponding bitmap byte array
 /////////////////////////////////////////////////////////////////////////////
-const uint16_t * getWeatherBitmap(String iconId) {
+inline const uint16_t * getWeatherBitmap(String iconId) {
     if (iconId.startsWith("01d"))
         return i01d;
     else if (iconId.startsWith("01n"))
