@@ -9,7 +9,7 @@ void getScreenMetrics(){
 }
 
 void drawGradientStyle(double tempNow, double tempMin, double tempMax, String cityName, 
-                    String weatherDesc, String iconId, uint16_t primaryTextColor) {
+                    String weatherDesc, String iconId, uint16_t primaryTextColor, String tempChar) {
 
     getScreenMetrics();
     
@@ -32,7 +32,7 @@ void drawGradientStyle(double tempNow, double tempMin, double tempMax, String ci
 
     M5.Lcd.setTextSize(10);
     M5.Lcd.setCursor(30, 60);
-    M5.Lcd.printf("%.0fF", tempNow);
+    M5.Lcd.printf("%.0f%s", tempNow, tempChar.c_str());
 
     drawWeatherImage(iconId, 2);
 
@@ -42,11 +42,11 @@ void drawGradientStyle(double tempNow, double tempMin, double tempMax, String ci
     M5.Lcd.setTextSize(2);
     M5.Lcd.setTextColor(TFT_CYAN);
     M5.Lcd.setCursor(30, sHeight - 60);
-    M5.Lcd.printf("%.0fF", tempMin);
+    M5.Lcd.printf("%.0f%s", tempMin, tempChar.c_str());
     
     M5.Lcd.setTextColor(TFT_ORANGE);
     M5.Lcd.setCursor(sWidth - 80, sHeight - 60);
-    M5.Lcd.printf("%.0fF", tempMax);
+    M5.Lcd.printf("%.0f%s", tempMax, tempChar.c_str());
     
     M5.Lcd.setTextSize(1);
     M5.Lcd.setTextColor(TFT_WHITE);

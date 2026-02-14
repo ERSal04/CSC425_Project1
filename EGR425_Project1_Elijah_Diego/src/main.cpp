@@ -32,6 +32,11 @@ int zipcode[5] = {9, 0, 2, 1, 0}; // Default zipcode (90210 as example)
 int currentDigit = 0;             // Which digit we're currently editing (0-4)
 bool zipcodeMode = true;          // Are we in zipcode input mode?
 String zipcodeString = "90210";   // String version for API
+String lastZipCode = "00000";
+
+// Units Variable
+String tempUnit = "imperial";
+String tempChar = "F";
 
 // LCD variables
 // int sWidth;
@@ -58,10 +63,6 @@ void setup()
     displayZipcodeInput();
 
     getScreenMetrics();
-    
-    // Set screen orientation and get height/width
-    // sWidth = M5.Lcd.width();
-    // sHeight = M5.Lcd.height();
 
     // TODO 2: Connect to WiFi (this can take several seconds)
     WiFi.begin(wifiNetworkName.c_str(), wifiPassword.c_str());
@@ -91,7 +92,31 @@ void loop()
     if (zipcodeMode)
     {
         handleZipcodeInput();
+
         return; // Don't execute weather code yet
+    }
+
+    if (M5.BtnB.wasPressed()) {
+                if (tempUnit == "imperial") {
+                    tempUnit = "metric";
+                    tempChar = "C";
+                    Serial.printf("Changing units to Metric. Char: %s", tempChar.c_str());
+                } else {
+                    tempUnit = "imperial";
+                    tempChar = "F";
+                    Serial.printf("Changing units to Imperial. Char: %s", tempChar.c_str());
+                }
+                lastTime = 0;
+            }
+
+    if (M5.BtnC.wasPressed()) {
+        // Pre-populate the digit array with the last used zipcode
+        for (int i = 0; i < 5; i++) {
+            zipcode[i] = lastZipCode[i] - '0'; // Convert char to int
+        }
+        currentDigit = 0;
+        zipcodeMode = true;
+        displayZipcodeInput();
     }
 
     // Only execute every so often
@@ -110,7 +135,7 @@ void loop()
             // https://api.openweathermap.org/data/2.5/weather?q=tokyo,jp&units=imperial&appid=YOUR_API_KEY
             //////////////////////////////////////////////////////////////////
             // String serverURL = urlOpenWeather + "q=tokyo,jp&units=imperial&appId=" + apiKey;
-            String serverURL = urlOpenWeather + "zip=" + zipcodeString + ",us&units=imperial&appId=" + apiKey;
+            String serverURL = urlOpenWeather + "zip=" + zipcodeString + ",us&units=" + tempUnit + "&appId=" + apiKey;
             Serial.println(serverURL); // Debug print
 
             //////////////////////////////////////////////////////////////////
@@ -161,57 +186,12 @@ void loop()
             String imagePath = "http://openweathermap.org/img/wn/" + strWeatherIcon + "@2x.png";
             Serial.println(imagePath);
             response = httpGETRequest(imagePath.c_str());
-            Serial.print(response);
+            Serial.print(response); 
 
-            //////////////////////////////////////////////////////////////////
-            // TODO 11: Draw background - light blue if day time and navy blue of night
-            //////////////////////////////////////////////////////////////////
             uint16_t primaryTextColor;
+            // Draws the Weather details with a gradient and prints the last time it was updated
+            drawGradientStyle(tempNow, tempMin, tempMax, cityName, strWeatherDesc, strWeatherIcon, primaryTextColor, tempChar);
 
-            //////////////////////////////////////////////////////////////////
-            // TODO 12: Draw the icon on the right side of the screen - the built in
-            // drawBitmap method works, but we cannot scale up the image
-            // size well, so we'll call our own method
-            //////////////////////////////////////////////////////////////////
-            // M5.Lcd.drawBitmap(0, 0, 100, 100, myBitmap, TFT_BLACK);
-
-            drawGradientStyle(tempNow, tempMin, tempMax, cityName, strWeatherDesc, strWeatherIcon, primaryTextColor);
-
-            // if (strWeatherIcon.indexOf('d') > 0) {
-            //   M5.Lcd.fillScreen(TFT_CYAN);
-            //   primaryTextColor = TFT_BLACK;
-            // } else {
-            //   M5.Lcd.fillScreen(TFT_NAVY);
-            //   primaryTextColor = TFT_WHITE;
-            // }
-
-            // TODO 12.5 Draw the icon on the right side of the screen
-            // drawWeatherImage(strWeatherIcon, 2);
-
-            //////////////////////////////////////////////////////////////////
-            // TODO 13: Draw the temperatures and city name
-            //////////////////////////////////////////////////////////////////
-            // int pad = 10;
-            // M5.Lcd.setCursor(pad, pad);
-            // M5.Lcd.setTextColor(TFT_BLUE);
-            // M5.Lcd.setTextSize(3);
-            // M5.Lcd.printf("LO:%0.fF\n", tempMin);
-
-            // M5.Lcd.setCursor(M5.Lcd.getCursorX() + pad, M5.Lcd.getCursorY());
-            // M5.Lcd.setTextColor(primaryTextColor);
-            // M5.Lcd.setTextSize(10);
-            // M5.Lcd.printf("%0.fF\n", tempNow);
-
-            // M5.Lcd.setCursor(M5.Lcd.getCursorX() + pad, M5.Lcd.getCursorY());
-            // M5.Lcd.setTextColor(TFT_RED);
-            // M5.Lcd.setTextSize(3);
-            // M5.Lcd.printf("HI:%0.fF\n", tempMax);
-
-            // M5.Lcd.setCursor(M5.Lcd.getCursorX() + pad, M5.Lcd.getCursorY());
-            // M5.Lcd.setTextColor(primaryTextColor);
-            // M5.Lcd.printf("%s\n", cityName.c_str());
-
-            // drawTimeStamp(10, sHeight - 30, primaryTextColor);
         }
         else
         {
@@ -304,6 +284,13 @@ void displayZipcodeInput()
     M5.Lcd.setTextColor(TFT_GREEN);
     M5.Lcd.setCursor(20, 200);
     M5.Lcd.println("A: Prev  B: +1  C: Next");
+
+    if (lastZipCode != "00000") {
+        M5.Lcd.setTextSize(2);
+        M5.Lcd.setTextColor(TFT_DARKGREY);
+        M5.Lcd.setCursor(20, 220);
+        M5.Lcd.printf("Last: %s", lastZipCode.c_str());
+    }
 }
 
 // Function to handle zipcode input
@@ -334,6 +321,7 @@ void handleZipcodeInput()
             M5.Lcd.printf("Getting weather for\n     %s...", zipcodeString.c_str());
             delay(1500);
             lastTime = 0; // Force immediate weather update
+            lastZipCode = zipcodeString;
         }
         else
         {
