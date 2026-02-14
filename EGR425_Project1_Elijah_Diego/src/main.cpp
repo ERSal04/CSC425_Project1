@@ -27,6 +27,12 @@ String wifiPassword = "L@ncerN@tion";
 unsigned long lastTime = 0;
 unsigned long timerDelay = 5000; // 5000; 5 minutes (300,000ms) or 5 seconds (5,000ms)
 
+// Zipcode input variables
+int zipcode[5] = {9, 0, 2, 1, 0}; // Default zipcode (90210 as example)
+int currentDigit = 0;             // Which digit we're currently editing (0-4)
+bool zipcodeMode = true;          // Are we in zipcode input mode?
+String zipcodeString = "90210";   // String version for API
+
 // LCD variables
 // int sWidth;
 // int sHeight;
@@ -36,6 +42,9 @@ unsigned long timerDelay = 5000; // 5000; 5 minutes (300,000ms) or 5 seconds (5,
 ////////////////////////////////////////////////////////////////////
 String httpGETRequest(const char *serverName);
 // void drawWeatherImage(String iconId, int resizeMult);
+String getZipcodeString();
+void displayZipcodeInput();
+void handleZipcodeInput();
 
 ///////////////////////////////////////////////////////////////
 // Put your setup code here, to run once
@@ -44,14 +53,17 @@ void setup()
 {
     // Initialize the device
     M5.begin();
+    
+    // Show zipcode input IMMEDIATELY so user sees something
+    displayZipcodeInput();
 
     getScreenMetrics();
-
+    
     // Set screen orientation and get height/width
     // sWidth = M5.Lcd.width();
     // sHeight = M5.Lcd.height();
 
-    // TODO 2: Connect to WiFi
+    // TODO 2: Connect to WiFi (this can take several seconds)
     WiFi.begin(wifiNetworkName.c_str(), wifiPassword.c_str());
     Serial.printf("Connecting...");
     while (WiFi.status() != WL_CONNECTED)
@@ -63,6 +75,9 @@ void setup()
     Serial.println(WiFi.localIP());
 
     initTimeClient();
+    
+    // Redraw after WiFi is connected (in case WiFi messages overlapped)
+    displayZipcodeInput();
 }
 
 ///////////////////////////////////////////////////////////////
@@ -71,6 +86,13 @@ void setup()
 void loop()
 {
     M5.update();
+
+    // Handle zipcode input mode
+    if (zipcodeMode)
+    {
+        handleZipcodeInput();
+        return; // Don't execute weather code yet
+    }
 
     // Only execute every so often
     if ((millis() - lastTime) > timerDelay)
@@ -87,7 +109,8 @@ void loop()
             // https://api.openweathermap.org/data/2.5/weather?q=washington,dc,usa&units=imperial&appid=YOUR_API_KEY
             // https://api.openweathermap.org/data/2.5/weather?q=tokyo,jp&units=imperial&appid=YOUR_API_KEY
             //////////////////////////////////////////////////////////////////
-            String serverURL = urlOpenWeather + "q=tokyo,jp&units=imperial&appId=" + apiKey;
+            // String serverURL = urlOpenWeather + "q=tokyo,jp&units=imperial&appId=" + apiKey;
+            String serverURL = urlOpenWeather + "zip=" + zipcodeString + ",us&units=imperial&appId=" + apiKey;
             Serial.println(serverURL); // Debug print
 
             //////////////////////////////////////////////////////////////////
@@ -107,7 +130,8 @@ void loop()
             // TODO 7: (uncomment) Deserialize the JSON document and test if parsing succeeded
             //////////////////////////////////////////////////////////////////
             DeserializationError error = deserializeJson(objResponse, response);
-            if (error) {
+            if (error)
+            {
                 Serial.print(F("deserializeJson() failed: "));
                 Serial.println(error.f_str());
                 return;
@@ -163,7 +187,6 @@ void loop()
 
             // TODO 12.5 Draw the icon on the right side of the screen
             // drawWeatherImage(strWeatherIcon, 2);
-            
 
             //////////////////////////////////////////////////////////////////
             // TODO 13: Draw the temperatures and city name
@@ -228,6 +251,106 @@ String httpGETRequest(const char *serverURL)
     // Free resources and return response
     http.end();
     return response;
+}
+
+///////////////////////////////////////////////////////////////////
+//                      Get Based off area codes                 //
+//===============================================================//
+//    1. Ability to have 5 places to enter numbers               //
+//    2. Ensure you can increment each individual place up to 9  //
+//    3. Link area codes to locations                            //
+//    4. Change locations based off output                       //
+///////////////////////////////////////////////////////////////////
+
+// Function to convert zipcode array to string
+String getZipcodeString()
+{
+    String result = "";
+    for (int i = 0; i < 5; i++)
+    {
+        result += String(zipcode[i]);
+    }
+    return result;
+}
+
+// Function to display zipcode input UI
+void displayZipcodeInput()
+{
+    M5.Lcd.fillScreen(TFT_BLACK);
+    M5.Lcd.setTextSize(3);
+    M5.Lcd.setTextColor(TFT_WHITE);
+    M5.Lcd.setCursor(50, 50);
+    M5.Lcd.println("Enter Zipcode:");
+
+    // Display each digit
+    int xStart = 60;
+    int yPos = 120;
+    for (int i = 0; i < 5; i++)
+    {
+        // Highlight current digit
+        if (i == currentDigit)
+        {
+            M5.Lcd.fillRect(xStart + (i * 40) - 5, yPos - 5, 35, 50, TFT_BLUE);
+        }
+
+        M5.Lcd.setTextColor(i == currentDigit ? TFT_YELLOW : TFT_WHITE);
+        M5.Lcd.setCursor(xStart + (i * 40), yPos);
+        M5.Lcd.setTextSize(5);
+        M5.Lcd.print(zipcode[i]);
+    }
+
+    // Instructions
+    M5.Lcd.setTextSize(2);
+    M5.Lcd.setTextColor(TFT_GREEN);
+    M5.Lcd.setCursor(20, 200);
+    M5.Lcd.println("A: Prev  B: +1  C: Next");
+}
+
+// Function to handle zipcode input
+void handleZipcodeInput()
+{
+    if (M5.BtnA.wasPressed())
+    {
+        // Move to previous digit
+        currentDigit--;
+        if (currentDigit < 0)
+            currentDigit = 4;
+        displayZipcodeInput();
+    }
+
+    if (M5.BtnC.wasPressed())
+    {
+        // Move to next digit
+        currentDigit++;
+        if (currentDigit > 4)
+        {
+            // Done entering zipcode
+            zipcodeMode = false;
+            zipcodeString = getZipcodeString();
+            M5.Lcd.fillScreen(TFT_BLACK);
+            M5.Lcd.setTextSize(3);
+            M5.Lcd.setCursor(50, 100);
+            M5.Lcd.setTextColor(TFT_GREEN);
+            M5.Lcd.printf("Getting weather for\n     %s...", zipcodeString.c_str());
+            delay(1500);
+            lastTime = 0; // Force immediate weather update
+        }
+        else
+        {
+            displayZipcodeInput();
+        }
+    }
+
+    if (M5.BtnB.wasPressed())
+    {
+        // Increment current digit
+        zipcode[currentDigit]++;
+        if (zipcode[currentDigit] > 9)
+        {
+            zipcode[currentDigit] = 0;
+        }
+        displayZipcodeInput();
+    }
 }
 
 /////////////////////////////////////////////////////////////////
